@@ -48,6 +48,26 @@ jobs:
       - name: Build and Push
         uses: docker/build-push-action@v5
         with:
+        - name: Configurar acceso a k3s
+        shell: bash
+        env:
+          KUBECONFIG_DATA: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          mkdir -p ~/.kube
+          echo "$KUBECONFIG_DATA" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Deploy to k3s
+        id: deploy
+        run: |
+          kubectl apply -f k8s/deployment.yaml
+          kubectl rollout status deployment/demo-api --timeout=60s
+
+      - name: Rollback automático
+        if: failure()
+        run: |
+          kubectl rollout undo deployment/demo-api
+          kubectl rollout status deployment/demo-api --timeout=60s
           context: .
           push: ${{ inputs.should_push }}
           tags: ${{ secrets.DOCKER_HUB_USERNAME }}/node-app-painemilla:${{ inputs.image_tag }}
