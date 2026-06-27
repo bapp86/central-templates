@@ -15,6 +15,8 @@ on:
         required: false
       DOCKER_HUB_TOKEN:
         required: false
+      KUBE_CONFIG:
+        required: true
 
 jobs:
   integrated-pipeline:
@@ -48,7 +50,13 @@ jobs:
       - name: Build and Push
         uses: docker/build-push-action@v5
         with:
-        - name: Configurar acceso a k3s
+          context: .
+          push: ${{ inputs.should_push }}
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/node-app-painemilla:${{ inputs.image_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Configurar acceso a k3s
         shell: bash
         env:
           KUBECONFIG_DATA: ${{ secrets.KUBE_CONFIG }}
@@ -61,6 +69,7 @@ jobs:
         id: deploy
         run: |
           kubectl apply -f k8s/deployment.yaml
+          # Verificación con timeout explícito según pauta
           kubectl rollout status deployment/demo-api --timeout=60s
 
       - name: Rollback automático
@@ -68,8 +77,3 @@ jobs:
         run: |
           kubectl rollout undo deployment/demo-api
           kubectl rollout status deployment/demo-api --timeout=60s
-          context: .
-          push: ${{ inputs.should_push }}
-          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/node-app-painemilla:${{ inputs.image_tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
